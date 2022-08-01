@@ -1,0 +1,38 @@
+GET ece-info/_search?filter_path=**.value,**.key
+{
+  "size": 0,
+  "aggs": {
+    "ece-deployment": {
+      "terms": {
+        "field": "cluster_name"
+      },
+      "aggs": {
+        "deployment": {
+          "terms": {
+            "field": "name"
+          },
+          "aggs": {
+            "last_entry": {
+              "terms": {
+                "field": "@timestamp",
+                "order": [
+                  {
+                    "_key": "desc"
+                  }
+                ],
+                "size": 1
+              },
+              "aggs": {
+                "memory": {
+                  "max": {
+                    "field": "memory_usage"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

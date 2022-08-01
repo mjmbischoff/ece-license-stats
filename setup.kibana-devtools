@@ -1,0 +1,243 @@
+# Create ece-info ilm policy
+PUT _ilm/policy/ece-info
+{
+  "policy": {
+    "phases": {
+      "hot": {
+        "actions": {
+          "rollover": {
+            "max_primary_shard_size": "50gb"
+          }
+        }
+      },
+      "delete": {
+        "min_age": "735d",
+        "actions": {
+          "delete": {}
+        }
+      }
+    }
+  }
+}
+
+# Creates a component template for mappings
+PUT _component_template/ece-info-mappings
+{
+  "template": {
+    "mappings": {
+      "dynamic_templates": [
+        {
+          "strings_as_keywords": {
+            "match_mapping_type": "string",
+            "mapping": {
+              "type": "keyword"
+            }
+          }
+        },
+        {
+          "dont_index_associated_kibana_clusters": {
+            "path_match":   "*.info.associated_kibana_clusters",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        },
+        {
+          "dont_index_associated_apm_clusters": {
+            "path_match":  "*.info.associated_apm_clusters",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        },
+        {
+          "dont_index_associated_appsearch_clusters": {
+            "path_match":   "*.info.associated_appsearch_clusters",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        },        
+        {
+          "dont_index_user_settings_json": {
+            "path_match":   "*.elasticsearch.user_settings_json",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        },
+        {
+          "dont_index_external_links": {
+            "path_match":   "*.info.external_links",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "date_optional_time||epoch_millis"
+        },
+        "data_type": {
+          "type": "keyword"
+        },
+        "cluster_name": {
+          "type": "keyword"
+        },
+        "use_case": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "description": "Mappings for ece-info"
+  }
+}
+
+# Creates a component template for index settings
+PUT _component_template/ece-info-settings
+{
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "ece-info"
+    }
+  },
+  "_meta": {
+    "description": "Settings for ece-info"
+  }
+}
+
+# Creates template
+PUT _index_template/ece-info-index-template
+{
+  "index_patterns": ["ece-info"],
+  "data_stream": { },
+  "composed_of": [ "ece-info-mappings", "ece-info-settings" ],
+  "priority": 500,
+  "_meta": {
+    "description": "Template for ece-info"
+  }
+}
+
+# Creates API key
+POST /_security/api_key
+{
+  "name": "ece-license-information-api-key",
+  "role_descriptors": { 
+    "append-index-ece-information": {
+      "cluster": [],
+      "index": [
+        {
+          "names": ["ece-info"],
+          "privileges": ["auto_configure", "create_doc"]
+        }
+      ]
+    }
+  }
+}
+
+PUT _ingest/pipeline/collect-ece-license-info
+{
+  "description": "pipeline to process ece-license-info",
+  "processors": [
+    {
+      "set": {
+        "description": "Set message type for filtering/quering",
+        "field": "data_type",
+        "value": "ece-license-info"
+      }
+    }
+  ]
+}
+
+PUT _ingest/pipeline/collect-ece-deployments
+{
+  "description": "pipeline to process ece-deployments",
+  "processors": [
+    {
+      "set": {
+        "description": "Set message type for filtering/quering",
+        "field": "data_type",
+        "value": "ece-deployment"
+      }
+    },
+    {
+      "script": {
+        "description": "Extract memory usage for deployment",
+        "lang": "painless",
+        "source": """
+          ctx['memory_usage'] = 0;
+          ctx['memory_usage'] += ctx.resources?.elasticsearch?.stream()
+          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
+          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+          .sum();
+          ctx['memory_usage'] += ctx.resources?.kibana?.stream()
+          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
+          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+          .sum();
+          ctx['memory_usage'] += ctx.resources?.apm?.stream()
+          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
+          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+          .sum();
+          ctx['memory_usage'] += ctx.resources?.appsearch?.stream()
+          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
+          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+          .sum();
+          ctx['memory_usage'] += ctx.resources?.integrations_server?.stream()
+          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
+          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+          .sum();
+        """
+      }
+    }
+  ]
+}
+
+# build transform that maintains the latest status
+PUT _transform/ece-info-deployments-latest-status
+{
+  "source": {
+    "index": [
+      "ece-info"
+    ]
+  },
+  "latest": {
+    "unique_key": [
+      "cluster_name",
+      "id"
+    ],
+    "sort": "@timestamp"
+  },
+  "description": "maintains the latest entry of a deployment",
+  "dest": {
+    "index": "ece-info-deployments-latest-status"
+  },
+  "sync": {
+    "time": {
+      "field": "@timestamp"
+    }
+  },
+  "retention_policy": {
+    "time": {
+      "field": "@timestamp",
+      "max_age": "1d"
+    }
+  }
+}
+POST _transform/ece-info-deployments-latest-status/_start

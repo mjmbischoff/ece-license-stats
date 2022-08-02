@@ -18,6 +18,15 @@ These should be run against the cluster where we collect data (/dashboards)
 See the following two requests in `setup.kibana-devtools` file:
 ```kibana-devtools
 PUT _ingest/pipeline/collect-ece-license-info
+PUT deploymentname-usage_type
+PUT _enrich/policy/deploymentname-usage_type-policy
+POST /_enrich/policy/deploymentname-usage_type-policy/_execute
+PUT deploymentname-category
+POST /deploymentname-category/_doc/logging-and-metrics
+POST /deploymentname-category/_doc/admin-console-elasticsearch
+POST /deploymentname-category/_doc/security-cluster
+PUT _enrich/policy/deploymentname-category-policy
+POST _enrich/policy/deploymentname-category-policy/_execute
 PUT _ingest/pipeline/collect-ece-deployments
 ```
 Both of these should be run against the cluster where we collect data (/dashboards)
@@ -109,6 +118,46 @@ We transform the documents in ingest pipelines and not in the bash script to eas
 
 The different components(scripts, index pipelines, template, mappings, index name) aren't currently versioned should you want to run a mixed version environment it might be useful to introduce this. 
 
+### Identifying usage_type and category
+
+To identify a deployment's category or usage type we use the enrich processor where we do a lookup based on name. This could be adapted to use the id instead if id is not sufficiently unique. This technique can also be used to attach other metadata like the team owning the deployment or customer
+
+```json
+    {
+      "enrich": {
+        "description": "Add 'category' data based on deployment name",
+        "policy_name": "deploymentname-category-policy",
+        "field": "name",
+        "target_field": "found-category",
+        "max_matches": "1"
+      }
+    },
+    {
+      "rename": {
+        "field": "found-category.category",
+        "target_field": "category",
+        "on_failure": [
+          {
+            "set": {
+              "field": "category",
+              "value": "unindentified",
+              "override": false
+            }
+          }
+        ]
+      }
+    }
+```
+
+to add an entry to match on, run the following command:
+```
+POST /deploymentname-category/_doc/logging-and-metrics
+{
+  "name": "logging-and-metrics",
+  "category": "system"
+}
+POST /_enrich/policy/deploymentname-category-policy/_execute
+```
 ---
 
 # Uninstall

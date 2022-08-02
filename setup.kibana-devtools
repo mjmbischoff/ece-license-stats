@@ -166,6 +166,67 @@ PUT _ingest/pipeline/collect-ece-license-info
   ]
 }
 
+# Create index for lookup of usage_type
+PUT deploymentname-usage_type
+{
+  "mappings": {
+    "properties": {
+      "name": { "type": "keyword" },
+      "usage_type": { "type": "keyword" }
+    }
+  }
+}
+# Create enrich policy for lookup of usage_type
+PUT _enrich/policy/deploymentname-usage_type-policy
+{
+  "match": {
+    "indices": "deploymentname-usage_type",
+    "match_field": "name",
+    "enrich_fields": ["usage_type"]
+  }
+}
+# execute policy to prep lookup index for usage_type
+POST /_enrich/policy/deploymentname-usage_type-policy/_execute
+
+# Create index for lookup of category
+PUT deploymentname-category
+{
+  "mappings": {
+    "properties": {
+      "name": { "type": "keyword" },
+      "category": { "type": "keyword" }
+    }
+  }
+}
+# add entry for system cluster
+POST /deploymentname-category/_doc/logging-and-metrics
+{
+  "name": "logging-and-metrics",
+  "category": "system"
+}
+POST /deploymentname-category/_doc/admin-console-elasticsearch
+{
+  "name": "admin-console-elasticsearch",
+  "category": "system"
+}
+POST /deploymentname-category/_doc/security-cluster
+{
+  "name": "security-cluster",
+  "category": "system"
+}
+
+# Create enrich policy for lookup of category
+PUT _enrich/policy/deploymentname-category-policy
+{
+  "match": {
+    "indices": "deploymentname-category",
+    "match_field": "name",
+    "enrich_fields": ["category"]
+  }
+}
+# execute policy to prep lookup index for category
+POST _enrich/policy/deploymentname-category-policy/_execute
+
 PUT _ingest/pipeline/collect-ece-deployments
 {
   "description": "pipeline to process ece-deployments",
@@ -209,6 +270,7 @@ PUT _ingest/pipeline/collect-ece-deployments
   ]
 }
 
+
 # build transform that maintains the latest status
 PUT _transform/ece-info-deployments-latest-status
 {
@@ -238,6 +300,16 @@ PUT _transform/ece-info-deployments-latest-status
       "field": "@timestamp",
       "max_age": "1d"
     }
+  }
+}
+# Creates template for transform index
+PUT _index_template/ece-info-deployments-latest-status-index-template
+{
+  "index_patterns": ["ece-info-deployments-latest-status"],
+  "composed_of": [ "ece-info-mappings" ],
+  "priority": 500,
+  "_meta": {
+    "description": "Template for ece-info-deployments-latest-status"
   }
 }
 POST _transform/ece-info-deployments-latest-status/_start

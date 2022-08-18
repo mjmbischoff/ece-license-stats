@@ -12,6 +12,7 @@ if [ ${JSON: -1} == "}" ]; then
     JSON=${JSON//$'\n'/}
 
     RESPONSE=$(curl \
+        ${ADDITIONAL_CURL_FLAGS:-} \
         -XPOST "${TARGET_CLUSTER}/${TARGET_INDEX:-ece-info}/_doc?pipeline=collect-ece-license-info" \
         -H "kbn-xsrf: reporting" \
         -H "Content-Type: application/json" \

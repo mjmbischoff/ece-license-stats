@@ -21,6 +21,7 @@ while read -r line; do
         JSON=${JSON//$'\n'/}
 
         RESPONSE=$(curl \
+            ${ADDITIONAL_CURL_FLAGS:-} \
             -XPOST "${TARGET_CLUSTER}/${TARGET_INDEX:-ece-info}/_doc?pipeline=collect-ece-deployments" \
             -H "kbn-xsrf: reporting" \
             -H "Content-Type: application/json" \

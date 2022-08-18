@@ -15,7 +15,7 @@ These should be run against the cluster where we collect data (/dashboards)
 
 ## 2. Setup ingest pipelines
 
-See the following two requests in `setup.kibana-devtools` file:
+See the following requests in `setup.kibana-devtools` file:
 ```kibana-devtools
 PUT _ingest/pipeline/collect-ece-license-info
 PUT deploymentname-usage_type
@@ -29,9 +29,23 @@ PUT _enrich/policy/deploymentname-category-policy
 POST _enrich/policy/deploymentname-category-policy/_execute
 PUT _ingest/pipeline/collect-ece-deployments
 ```
-Both of these should be run against the cluster where we collect data (/dashboards)
+All of these should be run against the cluster where we collect data (/dashboards)
 
-## 3. Generate API key for target elasticsearch cluster to be used by scripts
+## 3. (Optional) create transforms
+
+The following commands create a transform and an template for the resulting index.
+See the following requests in `setup.kibana-devtools` file:
+```kibana-devtools
+PUT _transform/ece-info-deployments-latest-status
+PUT _index_template/ece-info-deployments-latest-status-index-template
+```
+
+Finally we should start the transform to make it active, this can be done through the UI or using the following command:
+```kibana-devtools
+POST _transform/ece-info-deployments-latest-status/_start
+```
+
+## 4. Generate API key for target elasticsearch cluster to be used by scripts
 
 See the following request in `setup.kibana-devtools` file:
 ```kibana-devtools
@@ -49,7 +63,7 @@ When run the result should be something like this:
 where `"encoded": "a1JFT1ZvSUIyTmNqZEthVGZZenc6ZWwzWkhYSUJTUFMzOWZULVhoMW83QQ=="` is the part we want to note down for later use.
 
 
-## 4. Install cron jobs
+## 5. Install cron jobs
 
 For each ECE installation you should set up the cron jobs(or your other favorite way of running periodic tasks):
 
@@ -93,7 +107,7 @@ The scripts can be run by a non-privileged user as only external calls are made 
 | ENCODED_API_KEY        | your API key as returned by the `POST /_security/api_key` request earlier in step 3 |
 | ADDITIONAL_CURL_FLAGS  | arguments / flags passed to CURL for example `ADDITIONAL_CURL_FLAGS="--insecure"` if skipping adding cert to trust store
 
-## 5. install dashboards
+## 6. install dashboards
 
 import saved objects, goto kibana and use `ece-info.ndjson`
 

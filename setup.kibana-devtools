@@ -101,6 +101,9 @@ PUT _component_template/ece-info-mappings
               "type": "text"
             }
           }
+        },
+        "license.cluster_licenses": {
+          "type": "nested"
         }
       }
     }
@@ -277,7 +280,14 @@ PUT _transform/ece-info-deployments-latest-status
   "source": {
     "index": [
       "ece-info"
-    ]
+    ],
+    "query": { 
+      "bool": {
+        "filter": [
+          { "term":  { "data_type": "ece-deployment" } }
+        ]
+      }
+    }
   },
   "latest": {
     "unique_key": [

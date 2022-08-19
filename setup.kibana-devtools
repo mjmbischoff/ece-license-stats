@@ -33,7 +33,76 @@ PUT _component_template/ece-info-mappings
               "type": "keyword"
             }
           }
+        }
+      ],
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "date_optional_time||epoch_millis"
         },
+        "data_type": {
+          "type": "keyword"
+        },
+        "cluster_name": {
+          "type": "keyword"
+        },
+        "usage_type": {
+          "type": "keyword"
+        },
+        "category": {
+          "type": "keyword"
+        },
+        "name": {
+          "type": "keyword",
+          "fields": {
+            "text": {
+              "type": "text"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_meta": {
+    "description": "Mappings for ece-info"
+  }
+}
+
+# Creates a component template for license mappings
+PUT _component_template/ece-info-license-mappings
+{
+  "template": {
+    "mappings": {
+      "dynamic_templates": [
+        {
+          "date_in_miliseconds_as_timestamp": {
+            "match_mapping_type": "long",
+            "match": "*_date_in_millis",
+            "mapping": {
+              "type": "date",
+              "format": "epoch_millis"
+            }
+          }
+        }
+      ],
+      "properties": {
+        "license.cluster_licenses": {
+          "type": "nested"
+        }
+      }
+    }
+  },
+  "_meta": {
+    "description": "ece-info license specific mappings"
+  }
+}
+
+# Creates a component template for deployment appings
+PUT _component_template/ece-info-deployment-mappings
+{
+  "template": {
+    "mappings": {
+      "dynamic_templates": [
         {
           "dont_index_associated_kibana_clusters": {
             "path_match":   "*.info.associated_kibana_clusters",
@@ -79,37 +148,11 @@ PUT _component_template/ece-info-mappings
             }
           }   
         }
-      ],
-      "properties": {
-        "@timestamp": {
-          "type": "date",
-          "format": "date_optional_time||epoch_millis"
-        },
-        "data_type": {
-          "type": "keyword"
-        },
-        "cluster_name": {
-          "type": "keyword"
-        },
-        "use_case": {
-          "type": "keyword"
-        },
-        "name": {
-          "type": "keyword",
-          "fields": {
-            "text": {
-              "type": "text"
-            }
-          }
-        },
-        "license.cluster_licenses": {
-          "type": "nested"
-        }
-      }
+      ]
     }
   },
   "_meta": {
-    "description": "Mappings for ece-info"
+    "description": "ece-info license specific mappings"
   }
 }
 
@@ -131,7 +174,7 @@ PUT _index_template/ece-info-index-template
 {
   "index_patterns": ["ece-info"],
   "data_stream": { },
-  "composed_of": [ "ece-info-mappings", "ece-info-settings" ],
+  "composed_of": [ "ece-info-mappings", "ece-info-license-mappings", "ece-info-deployment-mappings", "ece-info-settings" ],
   "priority": 500,
   "_meta": {
     "description": "Template for ece-info"
@@ -269,6 +312,54 @@ PUT _ingest/pipeline/collect-ece-deployments
           .sum();
         """
       }
+    },
+    {
+      "enrich": {
+        "description": "Add 'usage_type' data based on deployment name",
+        "policy_name": "deploymentname-usage_type-policy",
+        "field": "name",
+        "target_field": "found-usage_type",
+        "max_matches": "1"
+      }
+    },
+    {
+      "rename": {
+        "field": "found-usage_type.usage_type",
+        "target_field": "usage_type",
+        "on_failure": [
+          {
+            "set": {
+              "field": "usage_type",
+              "value": "unidentified",
+              "override": false
+            }
+          }
+        ]
+      }
+    },
+    {
+      "enrich": {
+        "description": "Add 'category' data based on deployment name",
+        "policy_name": "deploymentname-category-policy",
+        "field": "name",
+        "target_field": "found-category",
+        "max_matches": "1"
+      }
+    },
+    {
+      "rename": {
+        "field": "found-category.category",
+        "target_field": "category",
+        "on_failure": [
+          {
+            "set": {
+              "field": "category",
+              "value": "unidentified",
+              "override": false
+            }
+          }
+        ]
+      }
     }
   ]
 }
@@ -323,3 +414,50 @@ PUT _index_template/ece-info-deployments-latest-status-index-template
   }
 }
 POST _transform/ece-info-deployments-latest-status/_start
+
+PUT _transform/ece-info-license-latest-status
+{
+  "source": {
+    "index": [
+      "ece-info"
+    ],
+    "query": {
+      "bool": {
+        "should": [
+          {
+            "match_phrase": {
+              "data_type": "ece-license-info"
+            }
+          }
+        ],
+        "minimum_should_match": 1
+      }
+    }
+  },
+  "latest": {
+    "unique_key": [
+      "cluster_name"
+    ],
+    "sort": "@timestamp"
+  },
+  "description": "maintains the latest entry of license info",
+  "dest": {
+    "index": "ece-info-license-latest-status"
+  },
+  "sync": {
+    "time": {
+      "field": "@timestamp"
+    }
+  }
+}
+# Creates template for transform index
+PUT _index_template/ece-info-license-latest-status-index-template
+{
+  "index_patterns": ["ece-info-license-latest-status"],
+  "composed_of": [ "ece-info-mappings" ],
+  "priority": 500,
+  "_meta": {
+    "description": "Template for ece-info-license-latest-status"
+  }
+}
+POST _transform/ece-info-license-latest-status/_start

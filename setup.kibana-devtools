@@ -260,6 +260,11 @@ POST /deploymentname-category/_doc/security-cluster
   "name": "security-cluster",
   "category": "system"
 }
+POST /deploymentname-category/_doc/security-cluster
+{
+  "name": "security",
+  "category": "system"
+}
 
 # Create enrich policy for lookup of category
 PUT _enrich/policy/deploymentname-category-policy
@@ -291,25 +296,25 @@ PUT _ingest/pipeline/collect-ece-deployments
         "source": """
           ctx['memory_usage'] = 0;
           ctx['memory_usage'] += ctx.resources?.elasticsearch?.stream()
-          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
-          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
-          .sum();
+            ?.flatMap(resource -> resource?.info?.topology?.instances?.stream())
+            ?.mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+            ?.sum() ?: 0;
           ctx['memory_usage'] += ctx.resources?.kibana?.stream()
-          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
-          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
-          .sum();
+            ?.flatMap(resource -> resource?.info?.topology?.instances?.stream())
+            ?.mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+            ?.sum() ?: 0;
           ctx['memory_usage'] += ctx.resources?.apm?.stream()
-          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
-          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
-          .sum();
+            ?.flatMap(resource -> resource?.info?.topology?.instances?.stream())
+            ?.mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+            ?.sum() ?: 0;
           ctx['memory_usage'] += ctx.resources?.appsearch?.stream()
-          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
-          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
-          .sum();
+            ?.flatMap(resource -> resource?.info?.topology?.instances?.stream())
+            ?.mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+            ?.sum() ?: 0;
           ctx['memory_usage'] += ctx.resources?.integrations_server?.stream()
-          .flatMap(resource -> resource?.info?.topology?.instances?.stream())
-          .mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
-          .sum();
+            ?.flatMap(resource -> resource?.info?.topology?.instances?.stream())
+            ?.mapToInt(instance -> Optional.ofNullable(instance?.memory?.instance_capacity).orElse(0))
+            ?.sum() ?: 0;
         """
       }
     },

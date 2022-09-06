@@ -97,7 +97,7 @@ PUT _component_template/ece-info-license-mappings
   }
 }
 
-# Creates a component template for deployment appings
+# Creates a component template for deployment mappings
 PUT _component_template/ece-info-deployment-mappings
 {
   "template": {
@@ -139,6 +139,15 @@ PUT _component_template/ece-info-deployment-mappings
             }
           }   
         },
+        {
+          "dont_index_user_settings_override_json": {
+            "path_match":   "*.elasticsearch.user_settings_override_json",
+            "mapping": {
+              "type": "object",
+              "enabled": false
+            }
+          }   
+        },        
         {
           "dont_index_external_links": {
             "path_match":   "*.info.external_links",
